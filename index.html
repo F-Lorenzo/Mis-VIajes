@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16181d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mis Viajes">
+<title>Mis Viajes</title>
+<meta name="description" content="Calculadora de rentabilidad para conductores de apps: ganancia neta, nafta de trabajo vs. personal.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-column phone app. Net number on top, fuel split (work vs personal), 14-day bars, per-app, shift list; floating "+" button; bottom sheets for forms. */
+:root{
+  --bg:#f3f2ee;
+  --surface:#ffffff;
+  --ink:#17191e;
+  --muted:#6b6f78;
+  --line:#e2e0da;
+  --accent:#f2b705;      /* amarillo de señal vial */
+  --accent-ink:#17191e;
+  --personal:#5b7fb8;
+  --good:#1f8a4c;
+  --bad:#c8372d;
+  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111317; --surface:#1b1e24; --ink:#eef0f3; --muted:#9aa0aa; --line:#2b2f37;
+    --accent:#f5c02a; --accent-ink:#15171b; --personal:#7fa3dc; --good:#4cc27e; --bad:#ff6b5f; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111317; --surface:#1b1e24; --ink:#eef0f3; --muted:#9aa0aa; --line:#2b2f37;
+  --accent:#f5c02a; --accent-ink:#15171b; --personal:#7fa3dc; --good:#4cc27e; --bad:#ff6b5f; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+.app{
+  max-width:520px;margin:0 auto;min-height:100%;
+  padding:calc(env(safe-area-inset-top) + 14px) max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 110px) max(16px, env(safe-area-inset-left));
+  display:flex;flex-direction:column;gap:18px;
+}
+.num{font-variant-numeric:tabular-nums}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.brand .dot{width:12px;height:12px;border-radius:3px;background:var(--accent);transform:rotate(45deg)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;height:40px;padding:0 14px;font:500 14px var(--font-body);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.chip{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 14px;font:500 15px var(--font-body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px;display:flex;flex-direction:column;gap:14px}
+.hero .label{font-size:14px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.big{font-family:var(--font-display);font-weight:700;font-size:56px;line-height:1;letter-spacing:-.01em}
+.big.neg{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;border-top:1px dashed var(--line);padding-top:14px}
+.stat .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-family:var(--font-display);font-weight:600;font-size:22px}
+.split{display:flex;gap:10px}
+.pill{flex:1;border-radius:10px;padding:10px 12px;background:var(--bg)}
+.pill .k{font-size:12px;color:var(--muted)}
+.pill .v{font-weight:600}
+.pill.in .v{color:var(--good)} .pill.out .v{color:var(--bad)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card h2{margin:0;font-family:var(--font-display);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.04em;text-wrap:balance}
+.smallbtn{white-space:nowrap;flex:0 0 auto;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 12px;font:600 14px var(--font-body);cursor:pointer}
+
+.fuelbar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--bg)}
+.fuelbar .w{background:var(--accent)} .fuelbar .p{background:var(--personal)}
+.fuelkeys{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.fk .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.fk .k i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.fk .v{font-family:var(--font-display);font-weight:600;font-size:21px}
+.fuelnote{font-size:13px;color:var(--muted)}
+.loads{display:flex;flex-direction:column;border-top:1px dashed var(--line)}
+.load{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px;background:none;border-left:0;border-right:0;border-top:0;color:inherit;font-family:inherit;text-align:left;cursor:pointer;width:100%}
+.load:last-child{border-bottom:0}
+.load .m{color:var(--muted)}
+
+.bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:110px;position:relative}
+.bars::after{content:"";position:absolute;left:0;right:0;bottom:0;border-bottom:1px solid var(--line)}
+.bar{border-radius:4px 4px 0 0;background:var(--ink);min-height:2px;opacity:.85}
+.bar.neg{background:var(--bad)}
+.bar.empty{background:var(--line)}
+.bars-x{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin-top:-6px;font-size:11px;color:var(--muted);text-align:center}
+.bars-note{font-size:13px;color:var(--muted)}
+
+.apps{display:flex;flex-direction:column;gap:10px}
+.approw{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.track{height:8px;border-radius:999px;background:var(--bg);overflow:hidden}
+.track i{display:block;height:100%;background:var(--ink);border-radius:999px}
+
+.sec-title{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em;font-size:18px;margin:0 0 10px;font-weight:600}
+.list{display:flex;flex-direction:column;gap:8px}
+.shift{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;width:100%;color:inherit;font:inherit}
+.date{width:54px;text-align:center;border-right:1px solid var(--line);padding-right:10px}
+.date b{display:block;font-family:var(--font-display);font-size:24px;line-height:1}
+.date small{font-size:11px;color:var(--muted);text-transform:uppercase}
+.meta{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:6px;padding:1px 7px;margin-right:6px;background:var(--bg);color:var(--ink)}
+.amt{font-family:var(--font-display);font-weight:700;font-size:22px;text-align:right}
+.amt.neg{color:var(--bad)}
+.amt small{display:block;font-family:var(--font-body);font-weight:400;font-size:12px;color:var(--muted)}
+.empty-state{border:1.5px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:14px}
+.status{font-size:13px;color:var(--muted);text-align:center}
+.status:empty{display:none}
+
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 18px);z-index:10;
+  background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:16px 26px;
+  font:700 18px var(--font-display);text-transform:uppercase;letter-spacing:.05em;box-shadow:0 8px 24px rgba(0,0,0,.22);cursor:pointer;white-space:nowrap}
+
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.5);z-index:20;display:none;align-items:flex-end;justify-content:center}
+.scrim.open{display:flex}
+.sheet{background:var(--surface);width:100%;max-width:520px;max-height:92%;overflow-y:auto;border-radius:20px 20px 0 0;
+  padding:10px 18px calc(env(safe-area-inset-bottom) + 18px);display:flex;flex-direction:column;gap:14px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 4px}
+.sheet h3{margin:0;font-family:var(--font-display);font-size:24px;text-transform:uppercase;letter-spacing:.03em}
+.sheet h4{margin:4px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.field input{height:48px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font:500 18px var(--font-body);width:100%;min-width:0}
+.hint{font-size:12px;color:var(--muted)}
+.autofuel{border-radius:10px;background:var(--bg);padding:10px 12px;font-size:14px;display:flex;justify-content:space-between;gap:10px}
+.autofuel b{font-weight:600}
+.appchips{display:flex;flex-wrap:wrap;gap:8px}
+.preview{border-radius:12px;background:var(--bg);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
+.preview b{font-family:var(--font-display);font-size:28px}
+.preview b.neg{color:var(--bad)}
+.row-actions{display:flex;gap:10px}
+.btn{flex:1;height:52px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 16px var(--font-body);cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.danger.armed{background:var(--bad);color:#fff}
+.err{color:var(--bad);font-size:14px}
+.err:empty{display:none}
+.help{font-size:14px;color:var(--muted);line-height:1.5}
+.help b{color:var(--ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 86px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;display:none}
+[hidden]{display:none !important}
+@media (prefers-reduced-motion: no-preference){
+  .scrim.open .sheet{animation:up .22s ease-out}
+  @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="dot" aria-hidden="true"></span>Mis Viajes</div>
+    <div style="display:flex;gap:8px">
+      <button class="iconbtn" id="btnInstall" type="button" hidden>Instalar</button>
+      <button class="iconbtn" id="btnAjustes" type="button">Ajustes</button>
+    </div>
+  </header>
+
+  <div class="chips" role="group" aria-label="Período">
+    <button class="chip" type="button" data-p="hoy" aria-pressed="false">Hoy</button>
+    <button class="chip" type="button" data-p="semana" aria-pressed="false">Semana</button>
+    <button class="chip" type="button" data-p="mes" aria-pressed="true">Mes</button>
+    <button class="chip" type="button" data-p="todo" aria-pressed="false">Todo</button>
+  </div>
+
+  <section class="hero" aria-live="polite">
+    <div class="label"><span id="heroLabel">Ganancia neta · este mes</span><span id="heroDays" class="num"></span></div>
+    <div class="big num" id="heroNet">$0</div>
+    <div class="split">
+      <div class="pill in"><div class="k">Cobrado</div><div class="v num" id="heroIn">$0</div></div>
+      <div class="pill out"><div class="k">Gastos de trabajo</div><div class="v num" id="heroOut">$0</div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Por hora</div><div class="v num" id="stHora">–</div></div>
+      <div class="stat"><div class="k">Por km</div><div class="v num" id="stKm">–</div></div>
+      <div class="stat"><div class="k">Por día</div><div class="v num" id="stDia">–</div></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="fuelTitle">
+    <div class="card-h"><h2 id="fuelTitle">Nafta: trabajo vs. personal</h2><button class="smallbtn" type="button" id="btnCarga">+ Carga</button></div>
+    <div id="fuelBody"></div>
+  </section>
+
+  <section class="card">
+    <h2>Últimos 14 días</h2>
+    <div class="bars" id="bars"></div>
+    <div class="bars-x" id="barsX"></div>
+    <div class="bars-note" id="barsNote"></div>
+  </section>
+
+  <section class="card" id="appsCard">
+    <h2>Por app</h2>
+    <div class="apps" id="apps"></div>
+  </section>
+
+  <section>
+    <h2 class="sec-title">Jornadas</h2>
+    <div class="list" id="list"></div>
+  </section>
+  <div class="status" id="status"></div>
+</div>
+
+<button class="fab" id="fab" type="button">+ Nueva jornada</button>
+
+<!-- Hoja: jornada -->
+<div class="scrim" id="sheetShift" role="dialog" aria-modal="true" aria-labelledby="shiftTitle">
+  <form class="sheet" id="shiftForm" novalidate>
+    <div class="grab" aria-hidden="true"></div>
+    <h3 id="shiftTitle">Nueva jornada</h3>
+    <div class="field"><label for="fFecha">Fecha</label><input id="fFecha" type="date"></div>
+    <div class="field"><label>App</label><div class="appchips" id="appChips"></div></div>
+    <div class="grid2">
+      <div class="field"><label for="fCobrado">Cobrado en viajes ($)</label><input id="fCobrado" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div class="field"><label for="fPropinas">Propinas / bonos ($)</label><input id="fPropinas" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div class="field"><label for="fKm">Km de trabajo</label><input id="fKm" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div class="field"><label for="fHoras">Horas</label><input id="fHoras" inputmode="decimal" autocomplete="off" placeholder="Ej: 7,5"></div>
+      <div class="field"><label for="fOtros">Otros gastos ($)</label><input id="fOtros" inputmode="decimal" autocomplete="off" placeholder="Peajes, lavado…"></div>
+      <div class="field" id="combWrap"><label for="fComb">Nafta ($)</label><input id="fComb" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    </div>
+    <div class="hint" id="kmHint">Km de trabajo: anotá el cuentakilómetros al conectarte y al desconectarte, así entran los km entre viajes.</div>
+    <div class="autofuel" id="autoFuel" hidden><span>Nafta de esta jornada (calculada)</span><b class="num" id="autoFuelV">$0</b></div>
+    <div class="hint" id="combHint" hidden>Para que la nafta se calcule sola y se separe del uso personal, cargá los datos de tu auto en Ajustes.</div>
+    <div class="preview"><span>Te quedan</span><b class="num" id="pvNet">$0</b></div>
+    <div class="err" id="shiftErr"></div>
+    <div class="row-actions">
+      <button class="btn" type="button" data-close>Cancelar</button>
+      <button class="btn primary" type="submit" id="btnSave">Guardar</button>
+    </div>
+    <button class="btn danger" type="button" id="btnDelete" hidden>Borrar jornada</button>
+  </form>
+</div>
+
+<!-- Hoja: carga de nafta -->
+<div class="scrim" id="sheetCarga" role="dialog" aria-modal="true" aria-labelledby="cargaTitle">
+  <form class="sheet" id="cargaForm" novalidate>
+    <div class="grab" aria-hidden="true"></div>
+    <h3 id="cargaTitle">Carga de nafta</h3>
+    <p class="help" style="margin:0">Anotá cada vez que cargás, uses el auto para trabajar o no. La app separa cuánto fue de trabajo según tus km.</p>
+    <div class="field"><label for="cFecha">Fecha</label><input id="cFecha" type="date"></div>
+    <div class="grid2">
+      <div class="field"><label for="cMonto">Pagaste ($)</label><input id="cMonto" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div class="field"><label for="cLitros">Litros (opcional)</label><input id="cLitros" inputmode="decimal" autocomplete="off" placeholder="Ej: 30,5"></div>
+    </div>
+    <div class="hint" id="cPrecio">Con los litros, el precio por litro se actualiza solo.</div>
+    <div class="err" id="cargaErr"></div>
+    <div class="row-actions">
+      <button class="btn" type="button" data-close>Cancelar</button>
+      <button class="btn primary" type="submit" id="btnCargaSave">Guardar</button>
+    </div>
+    <button class="btn danger" type="button" id="btnCargaDelete" hidden>Borrar carga</button>
+  </form>
+</div>
+
+<!-- Hoja: ajustes -->
+<div class="scrim" id="sheetSettings" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <form class="sheet" id="setForm" novalidate>
+    <div class="grab" aria-hidden="true"></div>
+    <h3 id="setTitle">Ajustes</h3>
+    <h4>Tu auto</h4>
+    <div class="grid2">
+      <div class="field"><label for="sKmL">Rinde (km por litro)</label><input id="sKmL" inputmode="decimal" autocomplete="off" placeholder="Ej: 12"></div>
+      <div class="field"><label for="sPrecio">Precio del litro ($)</label><input id="sPrecio" inputmode="decimal" autocomplete="off" placeholder="Ej: 1250"></div>
+    </div>
+    <div class="hint" id="sCostoKm">Con estos dos datos la app calcula la nafta de cada jornada.</div>
+    <div class="field">
+      <label for="sDesg">Desgaste por km ($)</label>
+      <input id="sDesg" inputmode="decimal" autocomplete="off" placeholder="0">
+      <span class="hint">Opcional. Service, cubiertas, aceite y frenos repartidos por km. Se resta en cada jornada.</span>
+    </div>
+    <div class="err" id="setErr"></div>
+    <div class="row-actions">
+      <button class="btn" type="button" data-close>Cerrar</button>
+      <button class="btn primary" type="submit">Guardar</button>
+    </div>
+    <h4>Tus datos</h4>
+    <div class="help" id="backupInfo">Tus datos se guardan en este celular. Hacé una copia de seguridad cada tanto y mandátela por WhatsApp o mail.</div>
+    <button class="btn primary" type="button" id="btnBackup">Hacer copia de seguridad</button>
+    <button class="btn" type="button" id="btnRestore">Restaurar una copia</button>
+    <input type="file" id="fileRestore" accept="application/json,.json" hidden>
+    <button class="btn" type="button" id="btnCopy">Copiar jornadas como planilla (CSV)</button>
+    <div class="help" id="installHelp">
+      <b>Instalala en tu celu:</b><br>
+      Android: abrí el link en Chrome → menú ⋮ → <b>Instalar app</b> (o <b>Agregar a la pantalla principal</b>).<br>
+      iPhone: abrí el link en Safari → botón Compartir → <b>Agregar a inicio</b>.<br>
+      Una vez instalada funciona sin internet.
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  "use strict";
+  var APPS = ["Uber","DiDi","Cabify","inDrive","Otra"];
+  var state = { shifts: [], cargas: [], cfg: {desgasteKm:0, kmPorLitro:0, precioLitro:0}, period: "mes", editingId: null, cargaId: null, app: "Uber" };
+  var colJ = null, colC = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var money = new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0});
+  function fm(n){ return money.format(Math.round(n||0)).replace(/\s/g,""); }
+  function fmNum(n,d){ return new Intl.NumberFormat("es-AR",{maximumFractionDigits:d||0}).format(n||0); }
+
+  // Acepta "20.200", "20200", "1,5", "15.8", "1.234,50"
+  function parseNum(s){
+    s = String(s==null?"":s).trim().replace(/\$|\s/g,"");
+    if(!s) return 0;
+    if(s.indexOf(",")>=0){ s = s.replace(/\./g,"").replace(",","."); }
+    else if(/^\d{1,3}(\.\d{3})+$/.test(s)){ s = s.replace(/\./g,""); }
+    var n = Number(s);
+    return isFinite(n) ? n : NaN;
+  }
+  function toField(v){ return v ? String(v).replace(".",",") : ""; }
+  function pad(n){ return (n<10?"0":"")+n; }
+  function iso(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function fromIso(s){ var p=String(s).split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+  var DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
+  var MON = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
+  // Precio por litro: el de la última carga con litros; si no hay, el de Ajustes.
+  function precioLitro(){
+    var withL = state.cargas.filter(function(c){ return c.litros>0 && c.monto>0; }).sort(function(a,b){ return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:(b.creado||0)-(a.creado||0); });
+    if(withL.length) return withL[0].monto/withL[0].litros;
+    return state.cfg.precioLitro||0;
+  }
+  function naftaPorKm(){ var p = precioLitro(), r = state.cfg.kmPorLitro||0; return (p>0 && r>0) ? p/r : 0; }
+  function autoFuel(){ return naftaPorKm()>0; }
+
+  function calc(s){
+    var bruto = (s.cobrado||0)+(s.propinas||0);
+    var nafta = autoFuel() ? (s.km||0)*naftaPorKm() : (s.combustible||0);
+    var desg = (s.km||0)*(state.cfg.desgasteKm||0);
+    var gastos = nafta+(s.otros||0)+desg;
+    return { bruto:bruto, nafta:nafta, gastos:gastos, neta:bruto-gastos };
+  }
+
+  function inPeriod(fecha, p){
+    if(p==="todo") return true;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = fromIso(fecha);
+    if(p==="hoy") return iso(d)===iso(today);
+    if(p==="mes") return d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth();
+    if(p==="semana"){
+      var start = new Date(today); start.setDate(today.getDate()-((today.getDay()+6)%7));
+      var end = new Date(start); end.setDate(start.getDate()+6);
+      return d>=start && d<=end;
+    }
+    return true;
+  }
+  var PLABEL = {hoy:"hoy", semana:"esta semana", mes:"este mes", todo:"en total"};
+  function byDateDesc(a,b){ return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:(b.creado||0)-(a.creado||0); }
+  function el(tag, cls, text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+
+  function renderFuel(rows){
+    var body = $("fuelBody"); body.innerHTML = "";
+    var p = state.period;
+    var cargas = state.cargas.filter(function(c){ return inPeriod(c.fecha,p); });
+    var cargado = cargas.reduce(function(a,c){ return a+(c.monto||0); },0);
+    var trabajo = rows.reduce(function(a,s){ return a+calc(s).nafta; },0);
+    var kmT = rows.reduce(function(a,s){ return a+(s.km||0); },0);
+
+    if(!autoFuel()){
+      var msg = el("div","empty-state");
+      msg.textContent = "Cargá cuántos km por litro hace tu auto y el precio del litro en Ajustes. Con eso la app calcula la nafta de cada jornada y la separa de tu uso personal.";
+      body.appendChild(msg);
+      var b = el("button","smallbtn","Configurar mi auto"); b.type="button"; b.style.alignSelf="flex-start";
+      b.addEventListener("click", openSettings); body.appendChild(b);
+    } else {
+      var personal = Math.max(0, cargado-trabajo);
+      var tot = Math.max(cargado, trabajo) || 1;
+      var bar = el("div","fuelbar"); bar.setAttribute("aria-hidden","true");
+      var w = el("div","w"); w.style.width = (Math.min(trabajo,tot)/tot*100)+"%";
+      var pp = el("div","p"); pp.style.width = (personal/tot*100)+"%";
+      bar.appendChild(w); bar.appendChild(pp); body.appendChild(bar);
+      var keys = el("div","fuelkeys");
+      function key(label, color, val){
+        var k = el("div","fk"); var kk = el("div","k"); if(color){ var i=el("i"); i.style.background=color; kk.appendChild(i); } kk.appendChild(document.createTextNode(label));
+        k.appendChild(kk); k.appendChild(el("div","v num",val)); return k;
+      }
+      keys.appendChild(key("Cargaste", null, fm(cargado)));
+      keys.appendChild(key("Trabajo", "var(--accent)", fm(trabajo)));
+      keys.appendChild(key("Personal", "var(--personal)", cargas.length ? fm(personal) : "–"));
+      body.appendChild(keys);
+      var note = el("div","fuelnote num");
+      var pct = cargado>0 ? Math.round(Math.min(trabajo,cargado)/cargado*100) : null;
+      var txt = fmNum(kmT,1)+" km de trabajo × "+fm(naftaPorKm())+"/km";
+      if(!cargas.length) txt += ". Anotá tus cargas con “+ Carga” para ver cuánto fue personal.";
+      else if(trabajo>cargado) txt += ". Usaste más nafta de la que cargaste en este período: venías con el tanque cargado de antes.";
+      else txt += " · "+pct+"% de lo que cargaste fue para trabajar.";
+      note.textContent = txt; body.appendChild(note);
+    }
+
+    if(cargas.length){
+      var list = el("div","loads");
+      cargas.slice().sort(byDateDesc).slice(0,6).forEach(function(c){
+        var d = fromIso(c.fecha);
+        var r = el("button","load"); r.type="button";
+        r.appendChild(el("span","num", DOW[d.getDay()]+" "+d.getDate()+" "+MON[d.getMonth()]+(c.litros?" · "+fmNum(c.litros,1)+" L":"")));
+        r.appendChild(el("span","num m", fm(c.monto)));
+        r.addEventListener("click", function(){ openCarga(c); });
+        list.appendChild(r);
+      });
+      body.appendChild(list);
+    }
+  }
+
+  function render(){
+    var p = state.period;
+    var rows = state.shifts.filter(function(s){ return inPeriod(s.fecha,p); });
+    var t = {bruto:0,gastos:0,neta:0,km:0,horas:0}; var dias = {}; var byApp = {};
+    rows.forEach(function(s){
+      var c = calc(s);
+      t.bruto+=c.bruto; t.gastos+=c.gastos; t.neta+=c.neta; t.km+=s.km||0; t.horas+=s.horas||0;
+      dias[s.fecha]=1; var a = s.app||"Otra"; byApp[a]=(byApp[a]||0)+c.neta;
+    });
+    var nd = Object.keys(dias).length;
+    $("heroLabel").textContent = "Ganancia neta · " + PLABEL[p];
+    $("heroDays").textContent = nd ? (nd + (nd===1?" día":" días") + " · " + fmNum(t.horas,1) + " h") : "";
+    var hn = $("heroNet"); hn.textContent = fm(t.neta); hn.classList.toggle("neg", t.neta<0);
+    $("heroIn").textContent = fm(t.bruto);
+    $("heroOut").textContent = fm(t.gastos);
+    $("stHora").textContent = t.horas>0 ? fm(t.neta/t.horas) : "–";
+    $("stKm").textContent = t.km>0 ? fm(t.neta/t.km) : "–";
+    $("stDia").textContent = nd>0 ? fm(t.neta/nd) : "–";
+
+    renderFuel(rows);
+
+    // 14 días
+    var today = new Date(); today.setHours(0,0,0,0);
+    var perDay = {};
+    state.shifts.forEach(function(s){ perDay[s.fecha] = (perDay[s.fecha]||0) + calc(s).neta; });
+    var days = []; for(var i=13;i>=0;i--){ var d=new Date(today); d.setDate(today.getDate()-i); days.push(d); }
+    var vals = days.map(function(d){ return perDay[iso(d)]; });
+    var max = Math.max.apply(null, vals.map(function(v){ return Math.abs(v||0); }).concat([1]));
+    var bars = $("bars"); bars.innerHTML = ""; var bx = $("barsX"); bx.innerHTML = "";
+    var best = null;
+    days.forEach(function(d,i){
+      var v = vals[i]; var b = el("div");
+      if(v==null){ b.className="bar empty"; b.style.height="2px"; }
+      else { b.className = "bar"+(v<0?" neg":""); b.style.height = Math.max(4, Math.abs(v)/max*100)+"%"; if(!best || v>best.v) best={v:v,d:d}; }
+      b.title = DOW[d.getDay()]+" "+d.getDate()+": "+(v==null?"sin jornada":fm(v));
+      bars.appendChild(b);
+      bx.appendChild(el("span", null, (i%2===1) ? String(d.getDate()) : ""));
+    });
+    $("barsNote").textContent = best ? ("Mejor día: " + DOW[best.d.getDay()] + " " + best.d.getDate() + " " + MON[best.d.getMonth()] + ", " + fm(best.v) + " netos.") : "Todavía no hay jornadas en estos días.";
+
+    // Por app
+    var appsEl = $("apps"); appsEl.innerHTML = "";
+    var appKeys = Object.keys(byApp).sort(function(a,b){ return byApp[b]-byApp[a]; });
+    var amax = Math.max.apply(null, appKeys.map(function(k){ return Math.abs(byApp[k]); }).concat([1]));
+    $("appsCard").hidden = appKeys.length===0;
+    appKeys.forEach(function(k){
+      var r = el("div","approw"); r.appendChild(el("span",null,k));
+      var tr = el("div","track"); var ii=el("i"); ii.style.width = (Math.abs(byApp[k])/amax*100)+"%"; tr.appendChild(ii); r.appendChild(tr);
+      r.appendChild(el("span","num",fm(byApp[k]))); appsEl.appendChild(r);
+    });
+
+    // Lista
+    var list = $("list"); list.innerHTML = "";
+    var sorted = rows.slice().sort(byDateDesc);
+    if(!sorted.length){
+      list.appendChild(el("div","empty-state", state.shifts.length ? "No hay jornadas " + PLABEL[p] + "." : "Cargá tu primera jornada con el botón de abajo."));
+    }
+    sorted.forEach(function(s){
+      var c = calc(s); var d = fromIso(s.fecha);
+      var b = el("button","shift"); b.type="button";
+      var dt = el("div","date"); dt.appendChild(el("b",null,String(d.getDate()))); dt.appendChild(el("small",null,DOW[d.getDay()]+" "+MON[d.getMonth()]));
+      var mid = el("div");
+      var l1 = el("div"); l1.appendChild(el("span","tag",s.app||"Otra")); l1.appendChild(el("span","meta num",fmNum(s.horas,1)+" h · "+fmNum(s.km,1)+" km"));
+      mid.appendChild(l1);
+      mid.appendChild(el("div","meta num","Cobrado "+fm(c.bruto)+" · Nafta "+fm(c.nafta)));
+      var am = el("div","amt num"+(c.neta<0?" neg":""), fm(c.neta));
+      am.appendChild(el("small",null, s.horas>0 ? fm(c.neta/s.horas)+"/h" : ""));
+      b.appendChild(dt); b.appendChild(mid); b.appendChild(am);
+      b.addEventListener("click", function(){ openShift(s); });
+      list.appendChild(b);
+    });
+  }
+
+  // ---------- Hojas ----------
+  function openSheet(id){ $(id).classList.add("open"); }
+  function closeSheets(){ document.querySelectorAll(".scrim.open").forEach(function(s){ s.classList.remove("open"); }); }
+  document.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click", closeSheets); });
+  document.querySelectorAll(".scrim").forEach(function(sc){ sc.addEventListener("click", function(e){ if(e.target===sc) closeSheets(); }); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeSheets(); });
+
+  function buildAppChips(){
+    var w = $("appChips"); w.innerHTML = "";
+    APPS.forEach(function(a){
+      var c = el("button","chip",a); c.type="button"; c.setAttribute("aria-pressed", String(a===state.app));
+      c.addEventListener("click", function(){ state.app=a; buildAppChips(); });
+      w.appendChild(c);
+    });
+  }
+  var F = ["fCobrado","fPropinas","fOtros","fKm","fHoras","fComb"];
+  var K = ["cobrado","propinas","otros","km","horas","combustible"];
+  function readForm(){
+    var o = {}; var bad = null;
+    F.forEach(function(id,i){
+      if(id==="fComb" && autoFuel()) return;
+      var v = parseNum($(id).value); if(isNaN(v)||v<0) bad = bad||$(id); o[K[i]] = isNaN(v)?0:v;
+    });
+    return {data:o, bad:bad};
+  }
+  function updatePreview(){
+    var r = readForm().data; var c = calc(r);
+    var pv = $("pvNet"); pv.textContent = fm(c.neta); pv.classList.toggle("neg", c.neta<0);
+    $("autoFuelV").textContent = fm(c.nafta) + (r.km ? " ("+fmNum(r.km,1)+" km × "+fm(naftaPorKm())+")" : "");
+  }
+  F.forEach(function(id){ $(id).addEventListener("input", updatePreview); });
+
+  var armed = false;
+  function openShift(s){
+    state.editingId = s ? s.id : null;
+    $("shiftTitle").textContent = s ? "Editar jornada" : "Nueva jornada";
+    $("fFecha").value = s ? s.fecha : iso(new Date());
+    state.app = s ? (s.app||"Otra") : (state.lastApp || "Uber");
+    F.forEach(function(id,i){ $(id).value = s ? toField(s[K[i]]) : ""; });
+    var auto = autoFuel();
+    $("combWrap").hidden = auto; $("autoFuel").hidden = !auto; $("combHint").hidden = auto;
+    $("btnDelete").hidden = !s; armed=false; $("btnDelete").classList.remove("armed"); $("btnDelete").textContent="Borrar jornada";
+    $("shiftErr").textContent = "";
+    buildAppChips(); updatePreview(); openSheet("sheetShift");
+  }
+  $("fab").addEventListener("click", function(){ openShift(null); });
+
+  $("shiftForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var r = readForm();
+    if(r.bad){ $("shiftErr").textContent = "Revisá ese número: usá solo cifras, por ejemplo 20200 o 7,5."; r.bad.focus(); return; }
+    var fecha = $("fFecha").value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)){ $("shiftErr").textContent = "Elegí la fecha de la jornada."; return; }
+    if(!r.data.cobrado && !r.data.propinas){ $("shiftErr").textContent = "Poné cuánto cobraste en la jornada."; $("fCobrado").focus(); return; }
+    var existing = state.editingId ? state.shifts.find(function(x){ return x.id===state.editingId; }) : null;
+    var data = r.data; data.fecha = fecha; data.app = state.app;
+    if(autoFuel()){ data.combustible = existing && existing.combustible ? existing.combustible : 0; }
+    data.creado = existing && existing.creado ? existing.creado : Date.now();
+    state.lastApp = state.app;
+    $("btnSave").disabled = true;
+    save(colJ, "shifts", state.editingId, data).then(function(){ closeSheets(); toast(existing ? "Jornada actualizada" : "Jornada guardada"); })
+      .catch(function(err){ $("shiftErr").textContent = errMsg(err); })
+      .then(function(){ $("btnSave").disabled = false; });
+  });
+  $("btnDelete").addEventListener("click", function(){
+    if(!armed){ armed=true; this.classList.add("armed"); this.textContent="Tocá de nuevo para borrar"; return; }
+    remove(colJ, "shifts", state.editingId).then(function(){ closeSheets(); toast("Jornada borrada"); }).catch(function(err){ $("shiftErr").textContent = errMsg(err); });
+  });
+
+  // Cargas
+  var armedC = false;
+  function openCarga(c){
+    state.cargaId = c ? c.id : null;
+    $("cargaTitle").textContent = c ? "Editar carga" : "Carga de nafta";
+    $("cFecha").value = c ? c.fecha : iso(new Date());
+    $("cMonto").value = c ? toField(c.monto) : ""; $("cLitros").value = c ? toField(c.litros) : "";
+    $("btnCargaDelete").hidden = !c; armedC=false; $("btnCargaDelete").classList.remove("armed"); $("btnCargaDelete").textContent="Borrar carga";
+    $("cargaErr").textContent=""; updateCargaHint(); openSheet("sheetCarga");
+  }
+  function updateCargaHint(){
+    var m = parseNum($("cMonto").value), l = parseNum($("cLitros").value);
+    $("cPrecio").textContent = (m>0 && l>0) ? ("Te salió "+fm(m/l)+" el litro.") : "Con los litros, el precio por litro se actualiza solo.";
+  }
+  ["cMonto","cLitros"].forEach(function(id){ $(id).addEventListener("input", updateCargaHint); });
+  $("btnCarga").addEventListener("click", function(){ openCarga(null); });
+  $("cargaForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var m = parseNum($("cMonto").value), l = parseNum($("cLitros").value), f = $("cFecha").value;
+    if(isNaN(m)||m<=0){ $("cargaErr").textContent="Poné cuánto pagaste, por ejemplo 35000."; $("cMonto").focus(); return; }
+    if(isNaN(l)||l<0){ $("cargaErr").textContent="Revisá los litros, por ejemplo 28,5."; $("cLitros").focus(); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(f)){ $("cargaErr").textContent="Elegí la fecha de la carga."; return; }
+    var existing = state.cargaId ? state.cargas.find(function(x){ return x.id===state.cargaId; }) : null;
+    var data = {fecha:f, monto:m, litros:l||0, creado: existing && existing.creado ? existing.creado : Date.now()};
+    $("btnCargaSave").disabled = true;
+    save(colC, "cargas", state.cargaId, data).then(function(){ closeSheets(); toast(existing ? "Carga actualizada" : "Carga guardada"); })
+      .catch(function(err){ $("cargaErr").textContent = errMsg(err); })
+      .then(function(){ $("btnCargaSave").disabled = false; });
+  });
+  $("btnCargaDelete").addEventListener("click", function(){
+    if(!armedC){ armedC=true; this.classList.add("armed"); this.textContent="Tocá de nuevo para borrar"; return; }
+    remove(colC, "cargas", state.cargaId).then(function(){ closeSheets(); toast("Carga borrada"); }).catch(function(err){ $("cargaErr").textContent = errMsg(err); });
+  });
+
+  // Ajustes
+  function updateCostHint(){
+    var r = parseNum($("sKmL").value), pl = parseNum($("sPrecio").value);
+    var hasLoadPrice = state.cargas.some(function(c){ return c.litros>0; });
+    var p = hasLoadPrice ? precioLitro() : pl;
+    $("sCostoKm").textContent = (r>0 && p>0) ? ("Tu nafta te cuesta "+fm(p/r)+" por km"+(hasLoadPrice?" (con el precio de tu última carga).":".")) : "Con estos dos datos la app calcula la nafta de cada jornada.";
+  }
+  ["sKmL","sPrecio"].forEach(function(id){ $(id).addEventListener("input", updateCostHint); });
+  function openSettings(){
+    $("sKmL").value = toField(state.cfg.kmPorLitro); $("sPrecio").value = toField(Math.round(precioLitro()*100)/100 || state.cfg.precioLitro);
+    $("sDesg").value = toField(state.cfg.desgasteKm);
+    $("setErr").textContent=""; updateCostHint(); openSheet("sheetSettings");
+  }
+  $("btnAjustes").addEventListener("click", openSettings);
+  $("setForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var r = parseNum($("sKmL").value), pl = parseNum($("sPrecio").value), d = parseNum($("sDesg").value);
+    if([r,pl,d].some(function(v){ return isNaN(v)||v<0; })){ $("setErr").textContent="Usá solo números, por ejemplo 12 o 1250,50."; return; }
+    var cfg = {kmPorLitro:r, precioLitro:pl, desgasteKm:d};
+    if(cfg.kmPorLitro===state.cfg.kmPorLitro && cfg.precioLitro===state.cfg.precioLitro && cfg.desgasteKm===state.cfg.desgasteKm){ closeSheets(); return; }
+    saveConfig(cfg).then(function(){ closeSheets(); toast("Ajustes guardados"); }).catch(function(err){ $("setErr").textContent = errMsg(err); });
+  });
+  $("btnCopy").addEventListener("click", function(){
+    var lines = ["Fecha,App,Cobrado,Propinas,Km trabajo,Horas,Nafta trabajo,Otros,Desgaste,Neta"];
+    state.shifts.slice().sort(function(a,b){ return a.fecha<b.fecha?-1:1; }).forEach(function(s){
+      var c = calc(s);
+      lines.push([s.fecha,s.app,s.cobrado||0,s.propinas||0,s.km||0,s.horas||0,Math.round(c.nafta),s.otros||0,Math.round((s.km||0)*(state.cfg.desgasteKm||0)),Math.round(c.neta)].join(","));
+    });
+    try{ navigator.clipboard.writeText(lines.join("\n")).then(function(){ toast("Copiado. Pegalo en una planilla."); }, function(){ toast("No se pudo copiar en este navegador."); }); }
+    catch(_){ toast("No se pudo copiar en este navegador."); }
+  });
+
+  document.querySelectorAll(".chips .chip").forEach(function(c){
+    c.addEventListener("click", function(){
+      state.period = c.getAttribute("data-p");
+      document.querySelectorAll(".chips .chip").forEach(function(x){ x.setAttribute("aria-pressed", String(x===c)); });
+      try{ localStorage.setItem("misviajes.period", state.period); }catch(_){}
+      render();
+    });
+  });
+  try{ var sp = localStorage.getItem("misviajes.period"); if(sp && PLABEL[sp]){ state.period = sp; document.querySelectorAll(".chips .chip").forEach(function(x){ x.setAttribute("aria-pressed", String(x.getAttribute("data-p")===sp)); }); } }catch(_){}
+
+  var toastT;
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toastT); toastT=setTimeout(function(){ t.style.display="none"; }, 2200); }
+  function errMsg(err){
+    var c = err && err.code;
+    return "No se pudo guardar: el celular no tiene lugar libre para la app.";
+  }
+
+  // ---------- Guardado en el celular ----------
+  var LS_KEY = "misviajes.v2", LS_BACKUP = "misviajes.lastBackup";
+  function localLoad(){
+    try{ var o = JSON.parse(localStorage.getItem(LS_KEY)||"null");
+      if(o){ state.shifts=o.shifts||[]; state.cargas=o.cargas||[]; state.cfg=Object.assign({desgasteKm:0,kmPorLitro:0,precioLitro:0}, o.cfg||{}); } }catch(_){}
+  }
+  function localSave(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify({shifts:state.shifts, cargas:state.cargas, cfg:state.cfg})); return true; }
+    catch(_){ return false; }
+  }
+  function commit(){
+    if(!localSave()) return Promise.reject({code:"storage"});
+    render(); renderBackupInfo(); return Promise.resolve();
+  }
+  function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function save(_col, key, id, data){
+    if(id){ state[key] = state[key].map(function(s){ return s.id===id ? Object.assign({id:id}, data) : s; }); }
+    else { state[key].push(Object.assign({id:newId()}, data)); }
+    return commit();
+  }
+  function remove(_col, key, id){ state[key] = state[key].filter(function(s){ return s.id!==id; }); return commit(); }
+  function saveConfig(cfg){ state.cfg = cfg; return commit(); }
+  function setStatus(t){ $("status").textContent = t; }
+
+  // ---------- Copia de seguridad ----------
+  function lastBackup(){ try{ return +localStorage.getItem(LS_BACKUP)||0; }catch(_){ return 0; } }
+  function renderBackupInfo(){
+    var lb = lastBackup(); var n = state.shifts.length + state.cargas.length;
+    var info = "Tus datos se guardan en este celular. ";
+    if(lb){ var d = new Date(lb); info += "Última copia: " + d.getDate()+" "+MON[d.getMonth()]+" "+d.getFullYear()+"."; }
+    else info += "Todavía no hiciste ninguna copia de seguridad.";
+    $("backupInfo").textContent = info;
+    var days = lb ? (Date.now()-lb)/864e5 : Infinity;
+    setStatus(n>=3 && days>14 ? "Hace rato que no hacés una copia de seguridad. Andá a Ajustes → Hacer copia de seguridad." : "");
+  }
+  $("btnBackup").addEventListener("click", function(){
+    var data = {app:"mis-viajes", version:2, exportado:new Date().toISOString(), shifts:state.shifts, cargas:state.cargas, cfg:state.cfg};
+    var name = "mis-viajes-" + iso(new Date()) + ".json";
+    var blob = new Blob([JSON.stringify(data)], {type:"application/json"});
+    function mark(){ try{ localStorage.setItem(LS_BACKUP, String(Date.now())); }catch(_){} renderBackupInfo(); }
+    var file = null; try{ file = new File([blob], name, {type:"application/json"}); }catch(_){}
+    if(file && navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file], title:"Copia de Mis Viajes", text:"Copia de seguridad de Mis Viajes"})
+        .then(function(){ mark(); toast("Copia lista. Guardala en WhatsApp o en tu mail."); })
+        .catch(function(e){ if(e && e.name!=="AbortError") download(); });
+    } else download();
+    function download(){
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      mark(); toast("Copia descargada: " + name);
+    }
+  });
+  $("btnRestore").addEventListener("click", function(){ $("fileRestore").value=""; $("fileRestore").click(); });
+  $("fileRestore").addEventListener("change", function(){
+    var f = this.files && this.files[0]; if(!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      var o; try{ o = JSON.parse(rd.result); }catch(_){ o = null; }
+      if(!o || o.app!=="mis-viajes" || !Array.isArray(o.shifts)){ $("setErr").textContent = "Ese archivo no es una copia de Mis Viajes."; return; }
+      // Se suma a lo que ya hay: lo de la copia reemplaza solo los registros con el mismo id.
+      function merge(cur, inc){ var m = {}; cur.forEach(function(x){ m[x.id]=x; }); (inc||[]).forEach(function(x){ if(x && x.id && x.fecha) m[x.id]=x; }); return Object.keys(m).map(function(k){ return m[k]; }); }
+      var before = state.shifts.length + state.cargas.length;
+      state.shifts = merge(state.shifts, o.shifts); state.cargas = merge(state.cargas, o.cargas);
+      if(o.cfg && !state.cfg.kmPorLitro && !state.cfg.precioLitro && !state.cfg.desgasteKm) state.cfg = Object.assign(state.cfg, o.cfg);
+      var added = state.shifts.length + state.cargas.length - before;
+      commit().then(function(){ closeSheets(); toast("Copia restaurada" + (added>0 ? ": " + added + " registros nuevos." : ".")); })
+        .catch(function(){ $("setErr").textContent = "No hay lugar para guardar en este celular."; });
+    };
+    rd.onerror = function(){ $("setErr").textContent = "No se pudo leer el archivo. Probá de nuevo."; };
+    rd.readAsText(f);
+  });
+
+  // ---------- Instalación ----------
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); deferredPrompt = e; $("btnInstall").hidden = false; });
+  window.addEventListener("appinstalled", function(){ deferredPrompt = null; $("btnInstall").hidden = true; toast("App instalada"); });
+  $("btnInstall").addEventListener("click", function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(){ deferredPrompt = null; $("btnInstall").hidden = true; });
+  });
+  var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  if(standalone) $("installHelp").hidden = true;
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+  if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(function(){}); }
+
+  localLoad();
+  render();
+  renderBackupInfo();
+})();
+</script>
+</body>
+</html>
